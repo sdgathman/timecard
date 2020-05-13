@@ -82,9 +82,17 @@ class Timecard(object):
   def close(self):
     self.conn.close()
 
-  def detail(self,daysprev=0,filterClient=None):
+  def bills(self,client):
     c = self.conn.cursor()
-    start_time = today_at(0200)-daysprev*24*60*60
+    c.execute('''select timein,comment from timecard
+    	where user = ? and proj like ? order by timein''',
+    	[self.user,'BILL-'+client])
+    return [(r['timein'],r['comment']) for r in c]
+
+  def detail(self,daysprev=0,filterClient=None,start_time=None):
+    c = self.conn.cursor()
+    if not start_time:
+      start_time = today_at(0200)-daysprev*24*60*60
     if daysprev >= 7 and daysprev <= 14:
       end_time = start_time + 7*24*60*60
     else:
@@ -154,10 +162,20 @@ def client(proj):
   if proj in PERSONAL: return 'personal'
   return 'unilit'
 
-def clientReport(seq):
+def clientReport(seq=0,client='bms'):
   with Timecard(DBNAME,'stuart') as tc:
+    if seq:
+      seq = -1 - int(seq)
+    else:
+      seq = -1
+    bills = tc.bills(client)
+    if bills:
+      last_bill,comment = bills[seq]
+    else:
+      last_bill,comment = None,None
     s = {}
-    for r in tc.detail(180,'bms'):
+    print "last bill:",time.ctime(last_bill)
+    for r in tc.detail(filterClient=client,start_time=last_bill):
       proj = r['proj']
       s[proj] = s.get(proj,0.0) + r['time']
       print '%-18s %s %8.2f %s' % (
