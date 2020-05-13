@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 # Simple timecard command
 
@@ -29,7 +29,7 @@ def today_at(tod=None):
       t = list(t)
       t[3] = tod//100
       t[4] = tod%100
-      now = time.mktime(t)
+      now = time.mktime(tuple(t))
     return now
 
 def thispast_at(dow,tod,now=None):
@@ -92,7 +92,7 @@ class Timecard(object):
   def detail(self,daysprev=0,filterClient=None,start_time=None):
     c = self.conn.cursor()
     if not start_time:
-      start_time = today_at(0200)-daysprev*24*60*60
+      start_time = today_at(200)-daysprev*24*60*60
     if daysprev >= 7 and daysprev <= 14:
       end_time = start_time + 7*24*60*60
     else:
@@ -104,13 +104,13 @@ class Timecard(object):
     lr = None
     for r in c:
       if lr and (not filterClient or client(lr['proj']) == filterClient):
-	d = {}
-	d['rowid'] = lr['rowid']
-	d['proj'] = lr['proj']
-	d['timein'] = lr['timein']
-	d['time'] = r['timein'] - lr['timein'] 
-	d['comment'] = lr['comment']
-	yield d
+        d = {}
+        d['rowid'] = lr['rowid']
+        d['proj'] = lr['proj']
+        d['timein'] = lr['timein']
+        d['time'] = r['timein'] - lr['timein'] 
+        d['comment'] = lr['comment']
+        yield d
       lr = r
     if lr and (not filterClient or client(lr['proj']) == filterClient):
       d = {}
@@ -123,8 +123,8 @@ class Timecard(object):
 
   def list(self,daysprev=0):
     for r in self.detail(daysprev):
-      print '%-18s %s %8.2f %s' % (
-      	r['proj'],time.ctime(r['timein']),r['time']/3600.0,r['comment'])
+      print('%-18s %s %8.2f %s' % (
+      	r['proj'],time.ctime(r['timein']),r['time']/3600.0,r['comment']))
 
   def summary(self,daysprev=0):
     s = {}
@@ -136,14 +136,14 @@ class Timecard(object):
   def punch_in(self,proj,comment='',tod=None):
     if tod:
       if tod.isdigit():
-	now = today_at(int(tod))
+        now = today_at(int(tod))
       elif tod[-2:].isdigit():
         now = last_at(tod)
       else:
-	now = thispast_at(tod[-3:],int(tod[:-3]))
+        now = thispast_at(tod[-3:],int(tod[:-3]))
     else:
       now = time.time()
-    print tod,time.ctime(now)
+    print(tod,time.ctime(now))
     cur = self.conn.execute('begin immediate')
     try:
       r = proj,self.user,self.host,now,None,comment
@@ -174,17 +174,17 @@ def clientReport(seq=0,client='bms'):
     else:
       last_bill,comment = None,None
     s = {}
-    print "last bill:",time.ctime(last_bill)
+    print("last bill:",time.ctime(last_bill))
     for r in tc.detail(filterClient=client,start_time=last_bill):
       proj = r['proj']
       s[proj] = s.get(proj,0.0) + r['time']
-      print '%-18s %s %8.2f %s' % (
-      	proj,time.ctime(r['timein']),r['time']/3600.0,r['comment'])
+      print('%-18s %s %8.2f %s' % (
+      	proj,time.ctime(r['timein']),r['time']/3600.0,r['comment']))
     tot = 0
     for proj,secs in s.items():
       tot += secs
-      print '%-18s %8.2f' % (proj,secs / 3600.0)
-    print 'total',tot/3600.0
+      print('%-18s %8.2f' % (proj,secs / 3600.0))
+    print('total',tot/3600.0)
 
 def istod(s):
   """True if s is a time specifier like HHMM or HHMMwww
@@ -204,14 +204,14 @@ def istod(s):
   return False
 
 def help():
-  print """
+  print("""
 Usage:	tcf -c<client>		# list transactions for client
 	tcf -<num> 		# list transactions for <num> days prev
 	tcf HHMM proj [desc]	# add transition for proj at specific time
 	tcf HHMMwww proj [desc]	# add transition for proj at previous weekday
 	tcf HHMMmmmdd proj [desc] # add transition for proj at previous date
 	tcf proj [desc]		# add transition for proj at current time
-"""
+""")
   try:
     import doctest, tc
     return doctest.testmod(tc)
@@ -247,8 +247,8 @@ if __name__ == '__main__':
       s = {}
       for proj,secs in tc.summary(daysprev).items():
         c = client(proj)
-        print '%-8s %-18s %8.2f' % (c,proj,secs / 3600.0)
-	s[c] = s.get(c,0) + secs
-      print
+        print('%-8s %-18s %8.2f' % (c,proj,secs / 3600.0))
+        s[c] = s.get(c,0) + secs
+      print()
       for c,secs in s.items():
-        print '%-8s %-18s %8.2f' % ('TOTAL',c,secs / 3600.0)
+        print('%-8s %-18s %8.2f' % ('TOTAL',c,secs / 3600.0))
