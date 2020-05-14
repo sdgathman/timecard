@@ -259,19 +259,17 @@ def main(argp):
   config = configparser.ConfigParser()
   config.read([CFGFILE])
   if config.has_option('clients','personal'):
-    PERSONAL = set([q.strip()
-                for q in config.get('clients','personal').split(',')])
+    PERSONAL = set(q.strip()
+                for q in config.get('clients','personal').split(','))
     if opt.verbose: print(PERSONAL)
 
+  # client report
   if opt.client:
     clientReport(client=opt.proj)
     return 0
 
-  if not opt.daysprev:
-    comment = ' '.join(opt.desc)
-    with Timecard(DBNAME,'stuart') as tc:
-      tc.punch_in(opt.proj,comment,tod=opt.tod)
-  else:
+  # activity report
+  if opt.daysprev:
     with Timecard(DBNAME,'stuart') as tc:
       tc.list(opt.daysprev)
       s = {}
@@ -282,6 +280,17 @@ def main(argp):
       print()
       for c,secs in s.items():
         print('%-8s %-18s %8.2f' % ('TOTAL',c,secs / 3600.0))
+    return 0
+
+  # punch in new project
+  if opt.proj:
+    comment = ' '.join(opt.desc)
+    with Timecard(DBNAME,'stuart') as tc:
+      tc.punch_in(opt.proj,comment,tod=opt.tod)
+    return 0
+
+  argp.print_help()
+  return 2
 
 if __name__ == '__main__':
   rc = main(argparse.ArgumentParser(description='Timecard fast entry.'))
