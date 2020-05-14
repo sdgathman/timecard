@@ -6,8 +6,12 @@ import sqlite3
 import time
 import sys
 import os
+import configparser 
+import argparse
 
 DBNAME = os.path.expanduser('~/.timecard/timecards.sqlite')
+CFGFILE = os.path.expanduser('~/.timecard/timecard.cfg')
+
 WEEKDAYS = ('mon','tue','wed','thu','fri','sat','sun')
 MONTHS = ('jan','feb','mar','apr','may','jun',
 	  'jul','aug','sep','oct','nov','dec')
@@ -17,7 +21,6 @@ PERSONAL = set((
 	'church', 'gathman', 'seaman', 'hospital', 'cleaning', 'political',
 	'sabbath', 'accounting', 'library', 'f19'
 	))
-
 
 def today_at(tod=None):
     now = time.time()
@@ -44,7 +47,7 @@ def thispast_at(dow,tod,now=None):
     t = list(t)
     t[3] = tod//100
     t[4] = tod%100
-    return time.mktime(t)
+    return time.mktime(tuple(t))
 
 def last_at(ts,now=None):
     if not now:
@@ -156,6 +159,7 @@ class Timecard(object):
 
 def client(proj):
   "return personal, bms, unilit"
+  if not proj: return 'unilit'
   a = proj.split('-')
   if a[0] in PERSONAL: return 'personal'
   if proj.startswith('bms'): return 'bms'
@@ -217,38 +221,64 @@ Usage:	tcf -c<client>		# list transactions for client
     return doctest.testmod(tc)
   except: pass
 
-if __name__ == '__main__':
-  argv = sys.argv[1:]
-  if argv and argv[0].startswith('-'):
-    opt = argv[0]
-    argv = argv[1:]
-    if opt.startswith('-c'):
-      clientReport(opt[2:])
-      sys.exit(0)
-    if opt in ('-h','-?'):
-      help()
-      sys.exit(2)
-    daysprev = -int(opt)
-  else:
-    daysprev = 0
-  if argv:
-    if len(argv) > 1 and istod(argv[0]):
-      tod = argv[0]
-      argv = argv[1:]
-    else:
-      tod = None
-    proj = argv[0]
-    comment = ' '.join(argv[1:])
+class TODAction(argparse.Action):
+  def __call__(self, parser, namespace, v, option_string=None):
+    if namespace.verbose: print(self.dest,'=',v)
+    if self.dest == 'desc':
+      if namespace.desc:
+        namespace.desc += v
+      else:
+        setattr(namespace, self.dest, v)
+      return
+    if v:
+      if istod(v) and self.dest == 'tod':
+        setattr(namespace, self.dest, v)
+      elif v.startswith('-'):
+        setattr(namespace, 'daysprev', -int(v))
+      elif v[0].isdigit():
+        msg = "%s is not a project name" % v
+        raise argparse.ArgumentError(self,msg)
+      elif not namespace.proj:
+        setattr(namespace, 'proj', v)
+      else:
+        setattr(namespace, 'desc', [v])
+
+def main(argp):
+  config = configparser.ConfigParser()
+  config.read([CFGFILE])
+  argp.add_argument('-l','--list', dest='daysprev', metavar='DAYS', type=int,
+    help='list transaction for DAYS prev', default=0)
+  argp.add_argument('-c','--client',  action='store_true',
+    help='list transactions for PROJ/CLIENT')
+  argp.add_argument('-v','--verbose',  action='store_true',
+    help='show debugging info')
+  argp.add_argument('tod', action=TODAction, nargs='?', metavar='start', 
+    help='start time: -days | [HHMM|HHMMwww|HHMMmmmdd] ')
+  argp.add_argument('proj', action=TODAction, nargs='?', help='proj name')
+  argp.add_argument('desc', nargs='*', action=TODAction, help='optional description')
+  opt = argp.parse_args()
+  if opt.verbose: print(opt)
+
+  if opt.client:
+    clientReport(client=opt.proj)
+    return 0
+
+  if not opt.daysprev:
+    comment = ' '.join(opt.desc)
     with Timecard(DBNAME,'stuart') as tc:
-      tc.punch_in(proj,comment,tod=tod)
+      tc.punch_in(opt.proj,comment,tod=opt.tod)
   else:
     with Timecard(DBNAME,'stuart') as tc:
-      tc.list(daysprev)
+      tc.list(opt.daysprev)
       s = {}
-      for proj,secs in tc.summary(daysprev).items():
+      for proj,secs in tc.summary(opt.daysprev).items():
         c = client(proj)
         print('%-8s %-18s %8.2f' % (c,proj,secs / 3600.0))
         s[c] = s.get(c,0) + secs
       print()
       for c,secs in s.items():
         print('%-8s %-18s %8.2f' % ('TOTAL',c,secs / 3600.0))
+
+if __name__ == '__main__':
+  rc = main(argparse.ArgumentParser(description='Timecard fast entry.'))
+  sys.exit(rc)
