@@ -244,8 +244,6 @@ class TODAction(argparse.Action):
         setattr(namespace, 'desc', [v])
 
 def main(argp):
-  config = configparser.ConfigParser()
-  config.read([CFGFILE])
   argp.add_argument('-l','--list', dest='daysprev', metavar='DAYS', type=int,
     help='list transaction for DAYS prev', default=0)
   argp.add_argument('-c','--client',  action='store_true',
@@ -258,6 +256,12 @@ def main(argp):
   argp.add_argument('desc', nargs='*', action=TODAction, help='optional description')
   opt = argp.parse_args()
   if opt.verbose: print(opt)
+  config = configparser.ConfigParser()
+  config.read([CFGFILE])
+  if config.has_option('clients','personal'):
+    PERSONAL = set([q.strip()
+                for q in config.get('clients','personal').split(',')])
+    if opt.verbose: print(PERSONAL)
 
   if opt.client:
     clientReport(client=opt.proj)
