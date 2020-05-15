@@ -17,6 +17,7 @@ MONTHS = ('jan','feb','mar','apr','may','jun',
 	  'jul','aug','sep','oct','nov','dec')
 
 USER = None
+DAYJOB = None
 
 config = configparser.ConfigParser(empty_lines_in_values=False)
 
@@ -156,15 +157,15 @@ class Timecard(object):
       cur.close();
 
 def client(proj):
-  "return personal, bms, unilit"
-  if not proj: return 'unilit'
-  a = proj.split('-')
+  "return first matching client or project group define in config"
+  if not proj: return DAYJOB
+  a = proj.split('-',maxsplit=1)
   for c in config['clients']:
     p = set(q.strip() for q in config.get('clients',c).split(','))
     if a[0] in p: return c
     if proj in p: return c
   if proj.startswith('bms'): return 'bms'
-  return 'unilit'
+  return DAYJOB
 
 def clientReport(seq=0,client='bms'):
   with Timecard(DBNAME,USER) as tc:
@@ -207,15 +208,7 @@ def istod(s):
   	and s[-5:-2].lower() in MONTHS: return True
   return False
 
-def help():
-  print("""
-Usage:	tcf -c<client>		# list transactions for client
-	tcf -<num> 		# list transactions for <num> days prev
-	tcf HHMM proj [desc]	# add transition for proj at specific time
-	tcf HHMMwww proj [desc]	# add transition for proj at previous weekday
-	tcf HHMMmmmdd proj [desc] # add transition for proj at previous date
-	tcf proj [desc]		# add transition for proj at current time
-""")
+def test():
   try:
     import doctest, tc
     return doctest.testmod(tc)
@@ -248,24 +241,27 @@ def main(argp):
     help='list transaction for DAYS prev', default=0)
   argp.add_argument('-c','--client',  action='store_true',
     help='list transactions for PROJ/CLIENT')
-  argp.add_argument('-u','--user',  
-    help='override default user')
+  argp.add_argument('-u','--user', help='override configured user')
+  argp.add_argument('-d','--dayjob', help='override configured dayjob')
   argp.add_argument('-v','--verbose',  action='store_true',
     help='show debugging info')
+  argp.add_argument('-t','--test',  action='store_true',
+    help='run self test')
   argp.add_argument('tod', action=TODAction, nargs='?', metavar='start', 
     help='start time: -days | [HHMM|HHMMwww|HHMMmmmdd] ')
   argp.add_argument('proj', action=TODAction, nargs='?', help='proj name')
   argp.add_argument('desc', nargs='*', action=TODAction, help='optional description')
   opt = argp.parse_args()
-  if opt.verbose: print(opt)
+  if opt.verbose:
+    print(opt)
+  if opt.test:
+    return test()
 
   config.read([CFGFILE])
 
-  try:
-    USER = config['main']['user']
-    if opt.verbose: print('user =',USER)
-  except:
-    USER = opt.user
+  USER = config.get('main','user',fallback=opt.user)
+  if opt.verbose: print('user =',USER)
+  DAYJOB = config.get('main','dayjob',fallback=opt.dayjob)
     
   # client report
   if opt.client:
