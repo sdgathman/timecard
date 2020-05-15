@@ -15,12 +15,10 @@ CFGFILE = os.path.expanduser('~/.timecard/timecard.cfg')
 WEEKDAYS = ('mon','tue','wed','thu','fri','sat','sun')
 MONTHS = ('jan','feb','mar','apr','may','jun',
 	  'jul','aug','sep','oct','nov','dec')
-PERSONAL = set((
-	'bed','break','shower','homeserver','lunch','marty','bank','dinner',
-	'breakfast','mishi','movie','store','farm', 'nap', 'youngmen', 'mow',
-	'church', 'gathman', 'seaman', 'hospital', 'cleaning', 'political',
-	'sabbath', 'accounting', 'library', 'f19'
-	))
+
+USER = None
+
+config = configparser.ConfigParser(empty_lines_in_values=False)
 
 def today_at(tod=None):
     now = time.time()
@@ -161,13 +159,15 @@ def client(proj):
   "return personal, bms, unilit"
   if not proj: return 'unilit'
   a = proj.split('-')
-  if a[0] in PERSONAL: return 'personal'
+  for c in config['clients']:
+    p = set(q.strip() for q in config.get('clients',c).split(','))
+    if a[0] in p: return c
+    if proj in p: return c
   if proj.startswith('bms'): return 'bms'
-  if proj in PERSONAL: return 'personal'
   return 'unilit'
 
 def clientReport(seq=0,client='bms'):
-  with Timecard(DBNAME,'stuart') as tc:
+  with Timecard(DBNAME,USER) as tc:
     if seq:
       seq = -1 - int(seq)
     else:
@@ -248,6 +248,8 @@ def main(argp):
     help='list transaction for DAYS prev', default=0)
   argp.add_argument('-c','--client',  action='store_true',
     help='list transactions for PROJ/CLIENT')
+  argp.add_argument('-u','--user',  
+    help='override default user')
   argp.add_argument('-v','--verbose',  action='store_true',
     help='show debugging info')
   argp.add_argument('tod', action=TODAction, nargs='?', metavar='start', 
@@ -256,21 +258,27 @@ def main(argp):
   argp.add_argument('desc', nargs='*', action=TODAction, help='optional description')
   opt = argp.parse_args()
   if opt.verbose: print(opt)
-  config = configparser.ConfigParser()
-  config.read([CFGFILE])
-  if config.has_option('clients','personal'):
-    PERSONAL = set(q.strip()
-                for q in config.get('clients','personal').split(','))
-    if opt.verbose: print(PERSONAL)
 
+  config.read([CFGFILE])
+
+  try:
+    USER = config['main']['user']
+    if opt.verbose: print('user =',USER)
+  except:
+    USER = opt.user
+    
   # client report
   if opt.client:
     clientReport(client=opt.proj)
     return 0
 
+  if not USER:
+    print('No user specified.  Try adding to',CFGFILE)
+    return 2
+
   # activity report
   if opt.daysprev:
-    with Timecard(DBNAME,'stuart') as tc:
+    with Timecard(DBNAME,USER) as tc:
       tc.list(opt.daysprev)
       s = {}
       for proj,secs in tc.summary(opt.daysprev).items():
@@ -285,7 +293,7 @@ def main(argp):
   # punch in new project
   if opt.proj:
     comment = ' '.join(opt.desc)
-    with Timecard(DBNAME,'stuart') as tc:
+    with Timecard(DBNAME,USER) as tc:
       tc.punch_in(opt.proj,comment,tod=opt.tod)
     return 0
 
