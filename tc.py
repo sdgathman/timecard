@@ -164,7 +164,7 @@ def client(proj):
     p = set(q.strip() for q in config.get('clients',c).split(','))
     if a[0] in p: return c
     if proj in p: return c
-  if proj.startswith('bms'): return 'bms'
+  if proj.startswith('bms'): return 'bms'   # FIXME: needs a config
   return DAYJOB
 
 def clientReport(seq=0,client='bms'):
