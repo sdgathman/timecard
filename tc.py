@@ -124,6 +124,7 @@ class Timecard(object):
       yield d
 
   def list(self,daysprev=0):
+    print('%-18s %-24s %8s %s' % ('Project','      Start','Time','Comment'))
     for r in self.detail(daysprev):
       print('%-18s %s %8.2f %s' % (
       	r['proj'],time.ctime(r['timein']),r['time']/3600.0,r['comment']))
@@ -272,11 +273,14 @@ def main(argp):
     print('No user specified.  Try adding to',CFGFILE)
     return 2
 
+  if not opt.daysprev and not opt.proj:
+    opt.daysprev = 1
   # activity report
   if opt.daysprev:
     with Timecard(DBNAME,USER) as tc:
       tc.list(opt.daysprev)
       s = {}
+      print('\n%-8s %-18s %8s' % ('Client','Project','Time'))
       for proj,secs in tc.summary(opt.daysprev).items():
         c = client(proj)
         print('%-8s %-18s %8.2f' % (c,proj,secs / 3600.0))
