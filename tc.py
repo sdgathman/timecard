@@ -15,6 +15,7 @@ CFGFILE = os.path.expanduser('~/.timecard/timecard.cfg')
 WEEKDAYS = ('mon','tue','wed','thu','fri','sat','sun')
 MONTHS = ('jan','feb','mar','apr','may','jun',
 	  'jul','aug','sep','oct','nov','dec')
+DAY = 24*60*60
 
 USER = None
 DAYJOB = None
@@ -27,7 +28,7 @@ def today_at(tod=None):
       t = time.localtime(now)
       ctod = t[3]*100 + t[4]
       if tod > ctod:
-        t = time.localtime(now - 24*60*60)
+        t = time.localtime(now - DAY)
       t = list(t)
       t[3] = tod//100
       t[4] = tod%100
@@ -42,7 +43,7 @@ def thispast_at(dow,tod,now=None):
     cdow = t.tm_wday
     dow = WEEKDAYS.index(dow.lower())
     if dow < cdow: dow += 7
-    t = time.localtime(now - (7-dow+cdow)*24*60*60)
+    t = time.localtime(now - (7-dow+cdow)*DAY)
     t = list(t)
     t[3] = tod//100
     t[4] = tod%100
@@ -94,9 +95,9 @@ class Timecard(object):
   def detail(self,daysprev=0,filterClient=None,start_time=None):
     c = self.conn.cursor()
     if not start_time:
-      start_time = today_at(200)-daysprev*24*60*60
+      start_time = today_at(200)-daysprev*DAY
     if daysprev >= 7 and daysprev <= 14:
-      end_time = start_time + 7*24*60*60
+      end_time = start_time + 7*DAY
     else:
       end_time = time.time()
     c.execute('''select rowid,proj,user,host,timein,timeout,comment
@@ -212,8 +213,33 @@ def istod(s):
 def test():
   try:
     import doctest, tc
-    return doctest.testmod(tc)
+    import unittest
+
+    class TCTestCase(unittest.TestCase):
+
+      def setUp(self):
+        self.dbname = '/tmp/tctest.sqlite'
+        self.user = 'test'
+        self.host = 'localhost'
+        self.now = time.time()
+
+      def tearDown(self):
+        os.unlink(self.dbname)
+
+      def testClient(self):
+        with Timecard(self.dbname,self.user) as tc:
+          tc.punch_in('test-testproj','testing 1 2 3',tod='0900')
+          tc.punch_in('idle','sabbath',tod='0930')
+          bills = tc.bills('test')
+          self.assertEqual(bills,[])
+
+    suite = unittest.makeSuite(TCTestCase,'test')
+    suite.addTest(doctest.DocTestSuite(tc))
+    runner = unittest.TextTestRunner()
+    res = runner.run(suite)
+    if res.wasSuccessful(): return 0
   except: pass
+  return 1
 
 class TODAction(argparse.Action):
   def __call__(self, parser, namespace, v, option_string=None):
@@ -256,10 +282,12 @@ def main(argp):
   if opt.verbose:
     print(opt)
   if opt.test:
+    print('running tests')
     return test()
 
   config.read([CFGFILE])
 
+  global USER,DAYJOB
   USER = config.get('main','user',fallback=opt.user)
   if opt.verbose: print('user =',USER)
   DAYJOB = config.get('main','dayjob',fallback=opt.dayjob)
