@@ -265,7 +265,7 @@ class TODAction(argparse.Action):
 
 def main(argp):
   argp.add_argument('-l','--list', dest='daysprev', metavar='DAYS', type=int,
-    help='list transaction for DAYS prev', default=0)
+    help='list transaction for DAYS prev', default=None)
   argp.add_argument('-c','--client',  action='store_true',
     help='list transactions for PROJ/CLIENT')
   argp.add_argument('-u','--user', help='override configured user')
@@ -301,10 +301,10 @@ def main(argp):
     print('No user specified.  Try adding to',CFGFILE)
     return 2
 
-  if not opt.daysprev and not opt.proj:
-    opt.daysprev = 1
+  if opt.daysprev is None and not opt.proj:
+    opt.daysprev = 0
   # activity report
-  if opt.daysprev:
+  if opt.daysprev is not None:
     with Timecard(DBNAME,USER) as tc:
       tc.list(opt.daysprev)
       s = {}
