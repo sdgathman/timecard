@@ -181,17 +181,19 @@ def clientReport(seq=0,client='bms'):
     else:
       last_bill,comment = 1.0,None
     s = {}
-    print("last bill:",time.ctime(last_bill))
+    print("Last Bill:",time.ctime(last_bill))
+    print('\n%-18s %-24s %8s %s' % ('Project','      Start','Time','Comment'))
     for r in tc.detail(filterClient=client,start_time=last_bill):
       proj = r['proj']
       s[proj] = s.get(proj,0.0) + r['time']
       print('%-18s %s %8.2f %s' % (
       	proj,time.ctime(r['timein']),r['time']/3600.0,r['comment']))
     tot = 0
+    print('\n%-18s %8s' % ('Project','Time'))
     for proj,secs in s.items():
       tot += secs
       print('%-18s %8.2f' % (proj,secs / 3600.0))
-    print('total',tot/3600.0)
+    print('\n%-18s %8.2f'%('Total time:',tot/3600.0))
 
 def istod(s):
   """True if s is a time specifier like HHMM or HHMMwww
