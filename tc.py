@@ -179,7 +179,7 @@ def clientReport(seq=0,client='bms'):
     if bills:
       last_bill,comment = bills[seq]
     else:
-      last_bill,comment = None,None
+      last_bill,comment = 0.0,None
     s = {}
     print("last bill:",time.ctime(last_bill))
     for r in tc.detail(filterClient=client,start_time=last_bill):
