@@ -75,7 +75,7 @@ class Timecard(object):
     try:
       self.conn.execute('''create table timecard(
         proj text, user text, host text,
-        timein timestamp, timeout timestamp, comment text,
+        timein timestamp, comment text,
         primary key (timein,user,host))''')
     except: pass
 
@@ -100,7 +100,7 @@ class Timecard(object):
       end_time = start_time + 7*DAY
     else:
       end_time = time.time()
-    c.execute('''select rowid,proj,user,host,timein,timeout,comment
+    c.execute('''select rowid,proj,user,host,timein,comment
     	from timecard
     	where user = ? and timein between ? and ? order by timein''',
     	[self.user,start_time,end_time])
@@ -150,10 +150,10 @@ class Timecard(object):
     print(tod,time.ctime(now))
     cur = self.conn.execute('begin immediate')
     try:
-      r = proj,self.user,self.host,now,None,comment
+      r = proj,self.user,self.host,now,comment
       cur.execute('''insert into 
-          timecard(proj,user,host,timein,timeout,comment)
-          values(?,?,?,?,?,?)''', r)
+          timecard(proj,user,host,timein,comment)
+          values(?,?,?,?,?)''', r)
       self.conn.commit()
     finally:
       cur.close();
