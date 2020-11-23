@@ -78,3 +78,6 @@ BILLING
     This becomes a marker record which the "-c" method uses to filter only
     the unbilled time.
 
+    List charges for a client as of an ending time
+
+    $ tcf -c <client> 1000Jul16
