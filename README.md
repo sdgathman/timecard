@@ -66,3 +66,15 @@ between hosts and users.)
     [clients]
     personal = foo,bar,baz
     lawns = lawns
+
+BILLING
+    List charges for a client
+
+    $ tcf -c <client>
+
+    Create a Bill
+    $ tcf BILL-<client> Invoice #<12345>
+    This becomes the Last bill for the client, by putting a marker record.
+    This becomes a marker record which the "-c" method uses to filter only
+    the unbilled time.
+

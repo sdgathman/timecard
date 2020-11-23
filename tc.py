@@ -62,6 +62,15 @@ def last_at(ts,now=None):
     assert ts < now
     return ts
 
+def parse_tod(tod):
+    if tod:
+      if tod.isdigit():
+        return today_at(int(tod))
+      if tod[-2:].isdigit():
+        return last_at(tod)
+      return thispast_at(tod[-3:],int(tod[:-3]))
+    return time.time()
+
 class Timecard(object):
 
   def __init__(self,dbname,user,host=None):
@@ -85,21 +94,23 @@ class Timecard(object):
   def close(self):
     self.conn.close()
 
-  def bills(self,client):
+  def bills(self,client,end=None):
+    if not end: end = time.time()
     c = self.conn.cursor()
     c.execute('''select timein,comment from timecard
-    	where user = ? and proj like ? order by timein''',
-    	[self.user,'BILL-'+client])
+    	where user = ? and proj like ? and timein < ? order by timein''',
+    	[self.user,'BILL-'+client,end])
     return [(r['timein'],r['comment']) for r in c]
 
-  def detail(self,daysprev=0,filterClient=None,start_time=None):
+  def detail(self,daysprev=0,filterClient=None,start_time=None,end_time=None):
     c = self.conn.cursor()
     if not start_time:
       start_time = today_at(200)-daysprev*DAY
-    if daysprev >= 7 and daysprev <= 14:
-      end_time = start_time + 7*DAY
-    else:
-      end_time = time.time()
+    if not end_time:
+      if daysprev >= 7 and daysprev <= 14:
+        end_time = start_time + 7*DAY 
+      else:
+        end_time = time.time()
     c.execute('''select rowid,proj,user,host,timein,comment
     	from timecard
     	where user = ? and timein between ? and ? order by timein''',
@@ -138,15 +149,7 @@ class Timecard(object):
     return s
 
   def punch_in(self,proj,comment='',tod=None):
-    if tod:
-      if tod.isdigit():
-        now = today_at(int(tod))
-      elif tod[-2:].isdigit():
-        now = last_at(tod)
-      else:
-        now = thispast_at(tod[-3:],int(tod[:-3]))
-    else:
-      now = time.time()
+    now = parse_tod(tod)
     print(tod,time.ctime(now))
     cur = self.conn.execute('begin immediate')
     try:
@@ -169,21 +172,24 @@ def client(proj):
   if proj.startswith('bms'): return 'bms'   # FIXME: needs a config
   return DAYJOB
 
-def clientReport(seq=0,client='bms'):
-  with Timecard(DBNAME,USER) as tc:
+def clientReport(seq=0,user=None,client='bms',tod=None):
+  if not user: user = USER
+  with Timecard(DBNAME,user) as tc:
     if seq:
       seq = -1 - int(seq)
     else:
       seq = -1
-    bills = tc.bills(client)
+    end = parse_tod(tod)
+    bills = tc.bills(client,end)
     if bills:
       last_bill,comment = bills[seq]
     else:
       last_bill,comment = 1.0,None
     s = {}
     print("Last Bill:",time.ctime(last_bill))
+    print('Billing for',tc.user,'client',client,'As Of:',tod,time.ctime(end))
     print('\n%-18s %-24s %8s %s' % ('Project','      Start','Time','Comment'))
-    for r in tc.detail(filterClient=client,start_time=last_bill):
+    for r in tc.detail(filterClient=client,start_time=last_bill,end_time=end):
       proj = r['proj']
       s[proj] = s.get(proj,0.0) + r['time']
       print('%-18s %s %8.2f %s' % (
@@ -296,7 +302,7 @@ def main(argp):
     
   # client report
   if opt.client:
-    clientReport(client=opt.proj)
+    clientReport(client=opt.proj,tod=opt.tod)
     return 0
 
   if not USER:
